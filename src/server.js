@@ -26,10 +26,10 @@ let serverData = {
 };
 
 
-wss.on('connection', socket => {
+wss.on('connection', async (socket) => {
     // Handle initial socket connection (first connect from client)
     let uuid = v4();
-    console.log(`[${uuid}] connected`);
+    //console.log(`[${uuid}] connected`);
 
     // Send welcome message to client
     // @gd-com/utils handles the binary serialization for Godot types
@@ -43,8 +43,16 @@ wss.on('connection', socket => {
     socket.send(gdCom.putVar(serverData));
 
     // PlayerList represents all the active players currently joined into the server
-    playerlist.add(uuid);
-    let newPlayerData = playerlist.get(uuid);
+    await playerlist.add(uuid);
+    let newPlayerData = await playerlist.get(uuid);
+
+    // Spawn Player on local client
+    serverData.cmd = "spawn_local_player";
+    serverData.content = {
+        "msg": "Spawning local (you) player!",
+        "player": newPlayerData,
+    };
+    socket.send(gdCom.putVar(serverData))
 
     // Tell connected clients about the local client
     serverData.cmd = "spawn_new_player";
@@ -59,25 +67,36 @@ wss.on('connection', socket => {
         }
     });
 
-    // Spawn Player on local client
-    serverData.cmd = "spawn_local_player";
-    serverData.content = {
-        "msg": "Spawning local (you) player!",
-        "player": newPlayerData,
-    };
-    socket.send(gdCom.putVar(serverData))
-    
     // Spawn NetworkPlayer on local client
     serverData.cmd = "spawn_network_players";
     serverData.content = {
         "msg": "Spawning network players!",
-        "players": playerlist.players,
+        "players": await playerlist.getAll(),
     };
     socket.send(gdCom.putVar(serverData))
 
     // When server recieve message from client (socket), run the callback
     socket.on('message', (message) => {
         // Get message
+        let messageBuffer = Buffer.from(message);
+        let messageVariant = gdCom.getVar(messageBuffer);
+
+        if (messageVariant.value.cmd == "position") {
+            // Don't forget to update serverData for any new commands and contents
+            serverData.cmd = "update_position";
+            serverData.content = {
+                uuid,
+                "x": messageVariant.value.content.x,
+                "y": messageVariant.value.content.y,
+            };
+
+            wss.clients.forEach((client) => {
+                // Send to everyone but the local client
+                if (client !== socket && client.readyState === WebSocket.OPEN) {
+                    client.send(gdCom.putVar(serverData));
+                }
+            });
+        }
     });
 
     // On client error
@@ -87,6 +106,6 @@ wss.on('connection', socket => {
 
     // When client disconnects
     socket.on("close", (code, reason) => {
-        console.log("Client disconnected - ", code, reason);
+        //console.log("Client disconnected - ", code, reason);
     });
 });
