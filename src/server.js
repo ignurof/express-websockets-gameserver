@@ -4,6 +4,8 @@ const WebSocket = require('ws');
 const gdCom = require('@gd-com/utils');
 const { v4 } = require('uuid');
 
+const playerlist = require("./playerlist.js");
+
 // Server Application config
 const app = express();
 const PORT = 9090;
@@ -18,6 +20,12 @@ const server = app.listen(PORT, async() => {
 const wss = new WebSocket.Server({server: server});
 
 
+let serverData = {
+    "cmd": "null",
+    "content": {},
+};
+
+
 wss.on('connection', socket => {
     // Handle initial socket connection (first connect from client)
     let uuid = v4();
@@ -25,10 +33,23 @@ wss.on('connection', socket => {
 
     // Send welcome message to client
     // @gd-com/utils handles the binary serialization for Godot types
-    let welcomeMessageBuffer = gdCom.putVar(`Welcome to the server [${uuid}]`);
-    socket.send(welcomeMessageBuffer);
-    // TODO: Send to client
-    // Then just try if it works by creating a fresh Godot client, maybe using WebsocketPeer?
+    // let welcomeMessageBuffer = gdCom.putVar(`Welcome to the server [${uuid}]`);
+    // socket.send(welcomeMessageBuffer);
+    serverData.cmd = "joined_server";
+    serverData.content = {
+        "msg": "Welcome to the server!",
+        uuid,
+    };
+    socket.send(gdCom.putVar(serverData));
+
+    // PlayerList represents all the active players currently joined into the server
+    playerlist.add(uuid);
+
+    // TODO:
+    // 1. Tell connected clients about the local client
+    // 2. Spawn NetworkPlayer on already connected clients
+    // 3. Spawn Player on local client
+    // 4. Spawn NetworkPlayer on local client
 
 
     // When server recieve message from client (socket), run the callback
