@@ -44,13 +44,36 @@ wss.on('connection', socket => {
 
     // PlayerList represents all the active players currently joined into the server
     playerlist.add(uuid);
+    let newPlayerData = playerlist.get(uuid);
 
-    // TODO:
-    // 1. Tell connected clients about the local client
-    // 2. Spawn NetworkPlayer on already connected clients
-    // 3. Spawn Player on local client
-    // 4. Spawn NetworkPlayer on local client
+    // Tell connected clients about the local client
+    serverData.cmd = "spawn_new_player";
+    serverData.content = {
+        "msg": "Spawning new network player!",
+        "player": newPlayerData,
+    };
+    wss.clients.forEach((client) => {
+        // Send to everyone but the local client
+        if (client !== socket && client.readyState === WebSocket.OPEN) {
+            client.send(gdCom.putVar(serverData));
+        }
+    });
 
+    // Spawn Player on local client
+    serverData.cmd = "spawn_local_player";
+    serverData.content = {
+        "msg": "Spawning local (you) player!",
+        "player": newPlayerData,
+    };
+    socket.send(gdCom.putVar(serverData))
+    
+    // Spawn NetworkPlayer on local client
+    serverData.cmd = "spawn_network_players";
+    serverData.content = {
+        "msg": "Spawning network players!",
+        "players": playerlist.players,
+    };
+    socket.send(gdCom.putVar(serverData))
 
     // When server recieve message from client (socket), run the callback
     socket.on('message', (message) => {
