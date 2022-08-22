@@ -97,6 +97,19 @@ wss.on('connection', async (socket) => {
                 }
             });
         }
+
+        if (messageVariant.value.cmd == "chat") {
+            serverData.cmd = "new_chat_message";
+            serverData.content = {
+                "msg": messageVariant.value.content.msg,
+            };
+            console.log(messageVariant.value.content.msg);
+            wss.clients.forEach((client) => {
+                if (client !== socket && client.readyState === WebSocket.OPEN) {
+                    client.send(gdCom.putVar(serverData));
+                }
+            });
+        }
     });
 
     // On client error
